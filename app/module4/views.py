@@ -8,6 +8,7 @@ from .serializers import (
     CategoryReturnSerializer,
     CategorySerializer,
     CreateProductSerializer,
+    CreateProductStockSerializer,
 )
 
 # Create your views here.
@@ -144,6 +145,26 @@ class ProductInsertView(ViewSet):
         """
 
         serializer = CreateProductSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProductStockInsertView(ViewSet):
+    @extend_schema(
+        request=CreateProductStockSerializer,
+        responses={201: CreateProductStockSerializer},
+        tags=["Module 4"],
+    )
+    def create(self, request):
+        """
+        Creates a Product and stock record
+        """
+
+        serializer = CreateProductStockSerializer(data=request.data)
 
         if serializer.is_valid():
             serializer.save()
