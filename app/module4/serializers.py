@@ -1,10 +1,10 @@
 from inventory.models import (
     Category,
     Order,
-    OrderProduct,
     Product,
     StockManagement,
     User,
+    OrderProduct,
 )
 from rest_framework import serializers
 
@@ -18,7 +18,7 @@ class UserSerializer(serializers.ModelSerializer):
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ["id", "parent", "name", "slug", "is_active", "level"]
+        fields = ["id", "parent", "name", "slug", "level", "is_active"]
 
 
 class CategoryReturnSerializer(serializers.ModelSerializer):
@@ -122,69 +122,9 @@ class OrderSerializer(serializers.ModelSerializer):
 
         return order
 
-
 class CategoryBulkDeleteSerializer(serializers.Serializer):
     ids = serializers.ListField(
         child=serializers.IntegerField(),
         required=True,
         help_text="List of category IDs to delete",
     )
-
-
-# class CreateProductSerializer(serializers.ModelSerializer):
-#     new_category = serializers.SerializerMethodField()
-#     stock = StockManagementSerializer(write_only=True, required=True)
-
-#     class Meta:
-#         model = Product
-#         fields = [
-#             "id",
-#             "name",
-#             "slug",
-#             "description",
-#             "is_digital",
-#             "is_active",
-#             "price",
-#             "new_category",  # Accepts full category data
-#             "stock",
-#         ]
-
-#     def get_new_category(self, obj):
-#         """Returns the category info when reading the object"""
-#         return CategorySerializer(obj.category).data if obj.category else None
-
-#     def to_internal_value(self, data):
-#         """
-#         Override to_internal_value to handle category manually before DRF tries to validate it.
-#         """
-#         category_data = data.pop("new_category", None)
-#         validated_data = super().to_internal_value(data)
-
-#         if category_data:
-#             category_obj, _ = Category.objects.get_or_create(
-#                 name=category_data["name"],
-#                 defaults={
-#                     "slug": category_data.get("slug", ""),
-#                     "is_active": category_data.get("is_active", True),
-#                     "level": category_data.get("level", 1),
-#                     "parent": category_data.get("parent", None),
-#                 },
-#             )
-#             validated_data["category"] = category_obj
-
-#         return validated_data
-
-#     def create(self, validated_data):
-#         """
-#         This method now receives an already validated category instance,
-#         so it won't trigger a duplicate insert.
-#         """
-#         stock_data = validated_data.pop("stock", None)
-
-#         # Create the product
-#         product = Product.objects.create(**validated_data)
-
-#         # Create stock entry
-#         StockManagement.objects.create(product=product, **stock_data)
-
-#         return product

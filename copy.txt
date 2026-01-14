@@ -1,9 +1,9 @@
+views.py: 
 from drf_spectacular.utils import (
     extend_schema,
 )
 from inventory.models import Category
 from rest_framework import status
-from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
@@ -12,31 +12,30 @@ from .serializers import (
     CategorySerializer,
     CreateProductSerializer,
     CreateProductStockSerializer,
-    OrderSerializer,
-    UserSerializer,
-    CategoryBulkDeleteSerializer,
 )
 
-# class InventoryCategoryModelViewset(ModelViewSet):
-#     queryset = Category.objects.all()  # get all categories
+# class InventoryCategoryModelViewSet(ModelViewSet):
+#     queryset = Category.objects.all()  # Fetch all categories
 #     serializer_class = InventoryCategorySerializer  # Use the serializer
 
-class InventoryCategoryViewset(ViewSet):
-
-    def list(self, request):
-        queryset = Category.objects.all()
-        serializer = CategorySerializer(queryset, many=True)
-        return Response(serializer.data)
+# class InventoryCategoryViewSet(ViewSet):
+#     def list(self, request):
+#         queryset = Category.objects.all()
+#         serializer = InventoryCategorySerializer(queryset, many=True)
+#         return Response(serializer.data)
 
 ####
-# Ex. 1 Inserting Data with create() and save=()
+####
+#  Ex.1 Inserting Data with create() and save=()
 ####
 
 
 class CategoryInsertViewSet(ViewSet):
     @extend_schema(
-        request=CategorySerializer,
-        responses={201: CategoryReturnSerializer},
+        request=CategorySerializer,  # This links the serializer for the request body
+        responses={
+            201: CategoryReturnSerializer
+        },  # Expected response will be the created category
         tags=["Module 4"],
     )
     def create(self, request):
@@ -48,40 +47,49 @@ class CategoryInsertViewSet(ViewSet):
             return_serializer = CategoryReturnSerializer(category_instance)
 
             return Response(return_serializer.data, status=status.HTTP_201_CREATED)
+
         else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.error, status=status.HTTP_400_BAD_REQUEST)
 
 
 ####
-# Ex. 2 Bulk Insert with bulk_create()
+#  Ex.2 Bulk Insert with bulk_create()
 ####
 
 
-class CategoryBulkInsertViewset(ViewSet):
+class CategoryBulkInsertViewSet(ViewSet):
     @extend_schema(
-        request=CategorySerializer(many=True),
-        responses={201: CategorySerializer(many=True)},
+        request=CategorySerializer(many=True),  # Accepts multiple objects
+        responses={
+            201: CategorySerializer(many=True)
+        },  # Returns multiple inserted objects
         tags=["Module 4"],
     )
     def create(self, request):
+        # Ensure request contains a list of items
         if not isinstance(request.data, list):
             return Response(
                 {"error": "Expected a list of objects"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Deserialize data (many=True allows multiple objects)
         serializer = CategorySerializer(data=request.data, many=True)
 
         if serializer.is_valid():
+            # Convert validated data to model instances (without saving yet)
             categories = [Category(**item) for item in serializer.validated_data]
 
-            created_category = Category.objects.bulk_create(categories)
+            # Use bulk_create() to insert all at once
+            created_categories = Category.objects.bulk_create(categories)
 
+            # Serialize the created objects and return response
             return Response(
-                CategorySerializer(created_category, many=True).data,
+                CategorySerializer(created_categories, many=True).data,
                 status=status.HTTP_201_CREATED,
             )
         else:
+            # Return validation errors
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -161,8 +169,8 @@ class ProductInsertViewSet(ViewSet):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 ####
@@ -281,3 +289,195 @@ class BulkDeleteCategoryViewSet(ViewSet):
                 {"error": "Invalid data", "details": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+serializer.py:
+from inventory.models import (
+    Category,
+    Order,
+    OrderProduct,
+    Product,
+    StockManagement,
+    User,
+)
+from rest_framework import serializers
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["username", "email", "password"]
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ["id", "parent", "name", "slug", "is_active", "level"]
+
+
+class CategoryReturnSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ["id", "name", "slug"]
+
+
+class StockManagementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StockManagement
+        fields = ["quantity"]
+
+
+class CreateProductSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "description",
+            "is_digital",
+            "is_active",
+            "price",
+            "category",
+        ]
+
+
+class CreateProductStockSerializer(serializers.ModelSerializer):
+    stock_data = StockManagementSerializer(write_only=True, required=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "description",
+            "is_digital",
+            "is_active",
+            "price",
+            "category",
+            "stock_data",
+        ]
+
+    def create(self, validated_data):
+        stock_data = validated_data.pop("stock_data", None)
+        product = Product.objects.create(**validated_data)
+        StockManagement.objects.create(product=product, **stock_data)
+
+        return product
+
+    def to_representation(self, instance):
+        """Customize the representation to include stock data."""
+        # Start with the default representation
+        data = super().to_representation(instance)
+
+        # Fetch the related stock data from the StockManagement model
+        stock_instance = StockManagement.objects.filter(product=instance).first()
+
+        # If stock data exists, add it to the response
+        if stock_instance:
+            data["stock_data"] = StockManagementSerializer(stock_instance).data
+        else:
+            data["stock_data"] = None  # In case there's no related stock data
+
+        return data
+
+
+class OrderProductSerializer(serializers.ModelSerializer):
+    """Handles individual product entries within an order"""
+
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+
+    class Meta:
+        model = OrderProduct
+        fields = ["product", "quantity"]
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    """Handles order creation with multiple products"""
+
+    products = OrderProductSerializer(
+        many=True, write_only=True
+    )  # Accept a list of products
+
+    class Meta:
+        model = Order
+        fields = ["user", "created_at", "updated_at", "products"]
+
+    def create(self, validated_data):
+        products_data = validated_data.pop("products")  # Extract product list
+        order = Order.objects.create(**validated_data)  # Create the order
+
+        # Create OrderProduct entries for each product in the request
+        order_products = [
+            OrderProduct(order=order, **product_data) for product_data in products_data
+        ]
+        OrderProduct.objects.bulk_create(order_products)  # Bulk insert
+
+        return order
+
+
+class CategoryBulkDeleteSerializer(serializers.Serializer):
+    ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=True,
+        help_text="List of category IDs to delete",
+    )
+
+
+# class CreateProductSerializer(serializers.ModelSerializer):
+#     new_category = serializers.SerializerMethodField()
+#     stock = StockManagementSerializer(write_only=True, required=True)
+
+#     class Meta:
+#         model = Product
+#         fields = [
+#             "id",
+#             "name",
+#             "slug",
+#             "description",
+#             "is_digital",
+#             "is_active",
+#             "price",
+#             "new_category",  # Accepts full category data
+#             "stock",
+#         ]
+
+#     def get_new_category(self, obj):
+#         """Returns the category info when reading the object"""
+#         return CategorySerializer(obj.category).data if obj.category else None
+
+#     def to_internal_value(self, data):
+#         """
+#         Override to_internal_value to handle category manually before DRF tries to validate it.
+#         """
+#         category_data = data.pop("new_category", None)
+#         validated_data = super().to_internal_value(data)
+
+#         if category_data:
+#             category_obj, _ = Category.objects.get_or_create(
+#                 name=category_data["name"],
+#                 defaults={
+#                     "slug": category_data.get("slug", ""),
+#                     "is_active": category_data.get("is_active", True),
+#                     "level": category_data.get("level", 1),
+#                     "parent": category_data.get("parent", None),
+#                 },
+#             )
+#             validated_data["category"] = category_obj
+
+#         return validated_data
+
+#     def create(self, validated_data):
+#         """
+#         This method now receives an already validated category instance,
+#         so it won't trigger a duplicate insert.
+#         """
+#         stock_data = validated_data.pop("stock", None)
+
+#         # Create the product
+#         product = Product.objects.create(**validated_data)
+
+#         # Create stock entry
+#         StockManagement.objects.create(product=product, **stock_data)
+
+#         return product
