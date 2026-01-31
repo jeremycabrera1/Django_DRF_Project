@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "inventory",
     "rest_framework",
     "module4",
+    "module5",
     "drf_spectacular",
 ]
 
@@ -137,4 +138,20 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Your Project description",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+}
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "django.db.backends": {
+            "level": "DEBUG",  # Log SQL queries
+            "handlers": ["console"],
+        },
+    },
 }

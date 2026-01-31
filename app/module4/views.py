@@ -21,12 +21,12 @@ from .serializers import (
 #     queryset = Category.objects.all()  # get all categories
 #     serializer_class = InventoryCategorySerializer  # Use the serializer
 
-class InventoryCategoryViewset(ViewSet):
+# class InventoryCategoryViewset(ViewSet):
 
-    def list(self, request):
-        queryset = Category.objects.all()
-        serializer = CategorySerializer(queryset, many=True)
-        return Response(serializer.data)
+#     def list(self, request):
+#         queryset = Category.objects.all()
+#         serializer = CategorySerializer(queryset, many=True)
+#         return Response(serializer.data)
 
 ####
 # Ex. 1 Inserting Data with create() and save=()
